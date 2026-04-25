@@ -1,0 +1,2034 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>SubSentry — Subdomain Scanner</title>
+<style>
+/* ── Reset ── */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+button{font:inherit;cursor:pointer}
+input,select{font:inherit}
+a{color:inherit}
+
+/* ── CSS Variables ── */
+:root {
+  --bg: #F5F7FA;
+  --surface: #FFFFFF;
+  --surface-2: #F9FAFB;
+  --border: #E4E7EC;
+  --border-2: #D1D5DB;
+  --fg: #111827;
+  --fg-2: #6B7280;
+  --fg-3: #9CA3AF;
+  --accent: #2563EB;
+  --accent-light: #EFF6FF;
+  --accent-fg: #FFFFFF;
+  --ok-bg: #ECFDF5;
+  --ok-fg: #059669;
+  --warn-bg: #FFFBEB;
+  --warn-fg: #D97706;
+  --bad-bg: #FEF2F2;
+  --bad-fg: #DC2626;
+  --gray-100: #F3F4F6;
+  --gray-500: #6B7280;
+  --radius: 8px;
+  --radius-sm: 5px;
+  --shadow-sm: 0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.04);
+  --shadow: 0 4px 12px rgba(0,0,0,.08), 0 2px 4px rgba(0,0,0,.04);
+  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+}
+[data-theme="dark"] {
+  --bg: #0D0F14;
+  --surface: #161B26;
+  --surface-2: #1C2333;
+  --border: #272F45;
+  --border-2: #333D55;
+  --fg: #E5E7EB;
+  --fg-2: #9CA3AF;
+  --fg-3: #6B7280;
+  --accent: #3B82F6;
+  --accent-light: #1E3A5F;
+  --ok-bg: #064E3B20;
+  --ok-fg: #34D399;
+  --warn-bg: #451A0320;
+  --warn-fg: #FBBF24;
+  --bad-bg: #450A0A20;
+  --bad-fg: #F87171;
+  --gray-100: #1F2937;
+  --gray-500: #9CA3AF;
+  --shadow-sm: 0 1px 3px rgba(0,0,0,.3);
+  --shadow: 0 4px 12px rgba(0,0,0,.4);
+}
+
+/* ── Base ── */
+html { font-family: var(--font); font-size: 14px; color: var(--fg); background: var(--bg); }
+body { min-height: 100vh; }
+
+/* ── Layout ── */
+.app { display: flex; flex-direction: column; min-height: 100vh; }
+
+/* ── Header ── */
+.app-header {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 0 24px;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  box-shadow: var(--shadow-sm);
+}
+.header-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--fg);
+  text-decoration: none;
+}
+.header-brand-icon {
+  width: 28px;
+  height: 28px;
+  background: var(--accent);
+  border-radius: 7px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+}
+.header-brand-sub {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--fg-2);
+  margin-top: 1px;
+}
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.icon-btn {
+  appearance: none;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--fg-2);
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background .12s, color .12s, border-color .12s;
+}
+.icon-btn:hover { background: var(--gray-100); color: var(--fg); }
+
+/* ── Main content ── */
+.app-main {
+  max-width: 1400px;
+  margin: 0 auto;
+  width: 100%;
+  padding: 28px 24px 48px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* ── Search ── */
+.search-wrap { display: flex; flex-direction: column; gap: 8px; }
+.search {
+  display: flex;
+  align-items: center;
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  transition: border-color .15s, box-shadow .15s;
+  box-shadow: var(--shadow-sm);
+}
+.search:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-light); }
+.search-scanning { border-color: var(--accent); }
+.search-icon { padding: 0 10px 0 14px; color: var(--fg-3); flex-shrink: 0; }
+.search-input {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--fg);
+  font-size: 15px;
+  height: 46px;
+  min-width: 0;
+}
+.search-input::placeholder { color: var(--fg-3); }
+.search-caret {
+  display: inline-block;
+  width: 2px;
+  height: 16px;
+  background: var(--accent);
+  animation: blink .9s step-end infinite;
+  margin-left: 2px;
+  vertical-align: middle;
+}
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+.search-btn {
+  appearance: none;
+  border: none;
+  background: var(--accent);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 0 20px;
+  height: 46px;
+  flex-shrink: 0;
+  transition: background .12s;
+}
+.search-btn:hover:not(:disabled) { background: #1D4ED8; }
+.search-btn:disabled { opacity: .5; cursor: not-allowed; }
+.search-hint { font-size: 12px; color: var(--fg-3); }
+.link {
+  appearance: none;
+  border: none;
+  background: none;
+  color: var(--accent);
+  font-size: inherit;
+  padding: 0;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.link:hover { opacity: .8; }
+
+/* ── Scan progress ── */
+.scan {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px 20px;
+  box-shadow: var(--shadow-sm);
+}
+.scan-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+.scan-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  font-size: 13px;
+}
+.scan-found { font-size: 12px; color: var(--fg-2); }
+.scan-stages { display: flex; flex-direction: column; gap: 8px; }
+.stage {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  transition: background .15s;
+}
+.stage-done { background: var(--ok-bg); }
+.stage-running { background: var(--accent-light); }
+.stage-pending { opacity: .45; }
+.stage-dot {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.stage-done .stage-dot { color: var(--ok-fg); }
+.stage-running .stage-dot { color: var(--accent); }
+.stage-body { flex: 1; min-width: 0; }
+.stage-name { font-size: 12px; font-weight: 600; }
+.stage-desc { font-size: 11px; color: var(--fg-2); margin-top: 1px; }
+.stage-meter {
+  width: 120px;
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.stage-bar { height: 100%; border-radius: 2px; transition: width .08s; }
+.stage-bar-done { background: var(--ok-fg); }
+.stage-bar-running { background: var(--accent); }
+.stage-bar-pending { background: transparent; }
+
+/* Spinners */
+.scan-spinner, .stage-spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin .7s linear infinite;
+  flex-shrink: 0;
+}
+.stage-running .stage-spinner { border-top-color: var(--accent); }
+@keyframes spin { to { transform: rotate(360deg); } }
+.stage-pending-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--fg-3);
+}
+
+/* ── Stat tiles ── */
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 12px;
+}
+@media (max-width: 900px) { .tiles { grid-template-columns: repeat(3, 1fr); } }
+.tile {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  box-shadow: var(--shadow-sm);
+}
+.tile-val { font-size: 26px; font-weight: 700; line-height: 1; margin-bottom: 4px; }
+.tile-label { font-size: 11px; color: var(--fg-2); font-weight: 500; }
+
+/* ── Toolbar ── */
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.toolbar-left { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; flex: 1; }
+.toolbar-right { display: flex; align-items: center; gap: 6px; }
+.filter-search {
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--fg);
+  font-size: 12px;
+  outline: none;
+  width: 160px;
+  transition: border-color .12s;
+}
+.filter-search:focus { border-color: var(--accent); }
+.filter-search::placeholder { color: var(--fg-3); }
+.row-count { font-size: 12px; color: var(--fg-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.row-count .muted { color: var(--fg-3); }
+
+/* Chips */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--fg-2);
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: background .1s, color .1s, border-color .1s;
+}
+.chip:hover { background: var(--gray-100); color: var(--fg); }
+.chip-active { background: var(--accent-light); border-color: var(--accent); color: var(--accent); }
+.chip-bad.chip-active { background: var(--bad-bg); border-color: var(--bad-fg); color: var(--bad-fg); }
+.chip-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.chip-primary:hover { background: #1D4ED8; }
+
+/* Dropdowns */
+.dd { position: relative; }
+.dd-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 200;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  min-width: 160px;
+  overflow: hidden;
+  animation: fadeIn .1s;
+}
+.dd-menu-right { left: auto; right: 0; }
+.dd-menu-scroll { max-height: 240px; overflow-y: auto; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; } }
+.dd-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 12px;
+  text-align: left;
+  border: none;
+  background: none;
+  color: var(--fg);
+  font-size: 12.5px;
+  transition: background .1s;
+}
+.dd-item:hover { background: var(--gray-100); }
+.dd-item-active { color: var(--accent); }
+.dd-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.dd-check:hover { background: var(--gray-100); }
+.dd-check input { accent-color: var(--accent); }
+
+/* ── Table ── */
+.table-wrap {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+.table-scroll { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; }
+.th {
+  padding: 9px 12px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--fg-2);
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+  transition: color .1s;
+}
+.th:hover { color: var(--fg); }
+.th-right { text-align: right; }
+.th-center { text-align: center; }
+.th-label { margin-right: 3px; }
+.th-arrow { opacity: .6; font-size: 10px; }
+
+.td {
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+.row:last-child td { border-bottom: none; }
+.row { cursor: pointer; transition: background .1s; }
+.row:hover { background: var(--gray-100); }
+.row-expanded > td { background: var(--accent-light) !important; }
+[data-theme="dark"] .row-expanded > td { background: #1E3A5F20 !important; }
+
+.td-chevron { width: 28px; padding-right: 0; color: var(--fg-3); }
+.chev { display: inline-flex; transition: transform .15s; }
+.chev-open { transform: rotate(180deg); }
+
+/* Row cells */
+.sub-cell { display: flex; align-items: center; gap: 6px; }
+.sub-name { font-weight: 600; color: var(--fg); }
+.sub-domain { color: var(--fg-3); font-size: 11.5px; }
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .03em;
+  flex-shrink: 0;
+}
+.badge-bad { background: var(--bad-bg); color: var(--bad-fg); border: 1px solid var(--bad-fg)30; }
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 20px;
+  font-size: 11.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.host-cell { display: flex; align-items: center; gap: 6px; }
+.host-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+.flag { font-size: 14px; }
+.country-name { color: var(--fg-2); font-size: 11.5px; margin-left: 4px; }
+
+.td-title { max-width: 200px; }
+.title-text { display: block; overflow: hidden; text-overflow: ellipsis; max-width: 200px; color: var(--fg-2); font-size: 12px; }
+
+.techs { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.tech {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 6px;
+  background: var(--gray-100);
+  color: var(--fg-2);
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+}
+.tech-outdated { background: var(--warn-bg); color: var(--warn-fg); }
+.tech-more { background: none; border: 1px dashed var(--border); }
+
+.port {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  background: var(--gray-100);
+  border-radius: 4px;
+  font-size: 11px;
+  font-family: ui-monospace, monospace;
+  margin-right: 3px;
+}
+.port-warn { background: var(--warn-bg); color: var(--warn-fg); }
+
+.ssl {
+  display: inline-block;
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-weight: 700;
+  font-size: 11.5px;
+}
+.ssl-Ap { background: #ECFDF5; color: #059669; }
+.ssl-A  { background: #F0FFF4; color: #16A34A; }
+.ssl-B  { background: var(--warn-bg); color: var(--warn-fg); }
+.ssl-C  { background: #FFF7ED; color: #C2410C; }
+.ssl-F  { background: var(--bad-bg); color: var(--bad-fg); }
+[data-theme="dark"] .ssl-Ap { background: #064E3B40; color: #34D399; }
+[data-theme="dark"] .ssl-A  { background: #064E3B30; color: #4ADE80; }
+[data-theme="dark"] .ssl-B  { background: var(--warn-bg); color: var(--warn-fg); }
+[data-theme="dark"] .ssl-C  { background: #431407; color: #FB923C; }
+[data-theme="dark"] .ssl-F  { background: var(--bad-bg); color: var(--bad-fg); }
+
+.risk-cell { display: flex; align-items: center; gap: 6px; }
+.risk-bar { width: 52px; height: 4px; background: var(--gray-100); border-radius: 2px; overflow: hidden; flex-shrink: 0; }
+.risk-bar-fill { height: 100%; border-radius: 2px; transition: width .3s; }
+.risk-num { font-size: 11.5px; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+.muted { color: var(--fg-3); }
+.small { font-size: 11.5px; }
+
+/* ── Expandable detail row ── */
+.row-detail-tr td { background: var(--surface-2); padding: 0; }
+
+/* ── Detail panel ── */
+.detail { padding: 16px; }
+.detail-grid {
+  display: grid;
+  grid-template-columns: 260px 1fr 1fr 1fr;
+  grid-template-rows: auto auto;
+  gap: 12px;
+}
+@media (max-width: 1100px) {
+  .detail-grid { grid-template-columns: 1fr 1fr; }
+}
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px;
+  box-shadow: var(--shadow-sm);
+}
+.card-shot { grid-row: 1 / 3; }
+.card-wide { grid-column: 2 / -1; }
+.card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.card-title { font-size: 12px; font-weight: 600; color: var(--fg-2); text-transform: uppercase; letter-spacing: .05em; }
+.card-link {
+  appearance: none;
+  border: none;
+  background: none;
+  color: var(--accent);
+  font-size: 12px;
+  padding: 0;
+}
+.card-link:hover { text-decoration: underline; }
+
+/* Screenshot placeholder */
+.shot { height: 180px; border-radius: 6px; overflow: hidden; background: var(--gray-100); }
+.shot-inner {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: hsl(var(--shot-hue, 220), 60%, 97%);
+}
+[data-theme="dark"] .shot-inner { background: hsl(var(--shot-hue, 220), 20%, 12%); }
+.shot-chrome {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 10px;
+  background: rgba(0,0,0,.04);
+  border-bottom: 1px solid rgba(0,0,0,.06);
+}
+[data-theme="dark"] .shot-chrome { background: rgba(255,255,255,.04); border-color: rgba(255,255,255,.06); }
+.shot-dot { width: 8px; height: 8px; border-radius: 50%; background: rgba(0,0,0,.15); }
+.shot-url { font-size: 9px; color: rgba(0,0,0,.4); margin-left: 6px; font-family: ui-monospace, monospace; }
+[data-theme="dark"] .shot-url { color: rgba(255,255,255,.35); }
+.shot-body { flex: 1; padding: 10px; display: flex; flex-direction: column; gap: 6px; overflow: hidden; position: relative; }
+.shot-title { font-size: 11px; font-weight: 600; opacity: .7; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.shot-line { height: 6px; border-radius: 3px; background: rgba(0,0,0,.08); }
+[data-theme="dark"] .shot-line { background: rgba(255,255,255,.08); }
+.shot-line-1 { width: 85%; }
+.shot-line-2 { width: 70%; }
+.shot-line-3 { width: 55%; }
+.shot-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; margin-top: 4px; }
+.shot-grid > div { height: 24px; border-radius: 4px; background: hsl(var(--shot-hue, 220), 40%, 80%); opacity: .5; }
+[data-theme="dark"] .shot-grid > div { background: hsl(var(--shot-hue, 220), 30%, 30%); }
+.shot-watermark { position: absolute; bottom: 4px; right: 6px; font-size: 8px; opacity: .3; white-space: nowrap; overflow: hidden; max-width: 90%; text-overflow: ellipsis; }
+.shot-empty {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: var(--fg-3);
+  font-size: 12px;
+}
+
+/* Risk list */
+.risk-list { display: flex; flex-direction: column; gap: 8px; }
+.risk-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 10px;
+  background: var(--warn-bg);
+  border-radius: 6px;
+  color: var(--warn-fg);
+  font-size: 12px;
+}
+.risk-item svg { flex-shrink: 0; margin-top: 1px; }
+.risk-item-bad { background: var(--bad-bg); color: var(--bad-fg); }
+.risk-item-ok { background: var(--ok-bg); color: var(--ok-fg); }
+.risk-item-title { font-weight: 600; }
+.risk-item-desc { font-size: 11px; opacity: .8; margin-top: 2px; }
+
+/* DNS */
+.dns { display: flex; flex-direction: column; gap: 6px; }
+.dns-row { display: flex; align-items: flex-start; gap: 10px; font-size: 12px; }
+.dns-type {
+  font-family: ui-monospace, monospace;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 5px;
+  background: var(--gray-100);
+  border-radius: 3px;
+  color: var(--fg-2);
+  min-width: 28px;
+  text-align: center;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.dns-vals { display: flex; flex-direction: column; gap: 2px; }
+
+/* Key-value */
+.kv { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
+.kv-row { display: flex; align-items: center; justify-content: space-between; font-size: 12px; gap: 10px; }
+.kv-k { color: var(--fg-2); font-size: 11.5px; flex-shrink: 0; }
+
+/* Ports */
+.ports-row { display: flex; align-items: center; gap: 8px; margin-top: 4px; flex-wrap: wrap; }
+.ports-list { display: flex; gap: 4px; flex-wrap: wrap; }
+
+/* Tech grid */
+.tech-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; }
+.tech-card {
+  padding: 8px 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.tech-card-warn { border-color: var(--warn-fg)50; background: var(--warn-bg); }
+.tech-card-name { font-weight: 600; font-size: 12.5px; display: flex; align-items: center; gap: 4px; }
+.tech-card-meta { font-size: 11px; color: var(--fg-2); margin-top: 2px; }
+
+/* Copyable cell */
+.copy-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: none;
+  color: var(--fg);
+  font-family: ui-monospace, monospace;
+  font-size: 11.5px;
+  padding: 2px 4px;
+  border-radius: 3px;
+  transition: background .1s;
+}
+.copy-cell:hover { background: var(--gray-100); }
+.copy-cell-on { color: var(--ok-fg); }
+.copy-cell-icon { opacity: 0; transition: opacity .1s; color: var(--fg-3); }
+.copy-cell:hover .copy-cell-icon { opacity: 1; }
+.copy-cell-on .copy-cell-icon { opacity: 1; color: var(--ok-fg); }
+
+/* ── Empty / idle state ── */
+.empty-state {
+  text-align: center;
+  padding: 60px 24px;
+  color: var(--fg-2);
+}
+.empty-state-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--gray-100);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 16px;
+  color: var(--fg-3);
+}
+.empty-state h3 { font-size: 16px; color: var(--fg); margin-bottom: 6px; }
+.empty-state p { font-size: 13px; max-width: 380px; margin: 0 auto; }
+
+/* ── Full-page detail modal ── */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.45);
+  z-index: 500;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  animation: fadeBg .15s;
+}
+@keyframes fadeBg { from { opacity: 0; } to { opacity: 1; } }
+.modal-sheet {
+  width: 560px;
+  max-width: 100vw;
+  height: 100vh;
+  background: var(--surface);
+  overflow-y: auto;
+  box-shadow: -8px 0 32px rgba(0,0,0,.15);
+  animation: slideIn .2s cubic-bezier(.25,.46,.45,.94);
+  display: flex;
+  flex-direction: column;
+}
+@keyframes slideIn { from { transform: translateX(40px); opacity: 0; } to { transform: none; opacity: 1; } }
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  background: var(--surface);
+  z-index: 10;
+}
+.modal-title { font-weight: 700; font-size: 15px; }
+.modal-subtitle { font-size: 12px; color: var(--fg-2); margin-top: 2px; }
+.modal-body { padding: 20px; display: flex; flex-direction: column; gap: 16px; flex: 1; }
+.modal-section { display: flex; flex-direction: column; gap: 10px; }
+.modal-section-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--fg-2);
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+.modal-kv { display: grid; grid-template-columns: 120px 1fr; gap: 6px 12px; font-size: 13px; }
+.modal-kv-k { color: var(--fg-2); }
+.modal-kv-v { font-weight: 500; word-break: break-all; }
+
+/* ── Tweaks panel button ── */
+.twk-open-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--fg-2);
+  font-size: 12px;
+  font-weight: 500;
+  transition: background .1s, color .1s;
+}
+.twk-open-btn:hover { background: var(--gray-100); color: var(--fg); }
+
+/* ── No results ── */
+.no-results { text-align: center; padding: 40px; color: var(--fg-3); font-size: 13px; }
+
+/* Density: compact */
+[data-density="compact"] .td { padding: 6px 12px; }
+[data-density="compact"] .tile { padding: 10px 14px; }
+[data-density="compact"] .tile-val { font-size: 22px; }
+[data-density="compact"] .search-input, [data-density="compact"] .search-btn { height: 38px; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+<script type="text/babel">
+// ─── Data ──────────────────────────────────────────────────────────────────
+const HOSTS = [
+  { name: "Cloudflare",     asn: "AS13335", color: "#F38020" },
+  { name: "Amazon AWS",     asn: "AS16509", color: "#FF9900" },
+  { name: "Google Cloud",   asn: "AS15169", color: "#4285F4" },
+  { name: "Fastly",         asn: "AS54113", color: "#FF282D" },
+  { name: "DigitalOcean",   asn: "AS14061", color: "#0080FF" },
+  { name: "Microsoft Azure",asn: "AS8075",  color: "#0078D4" },
+  { name: "GitHub Pages",   asn: "AS36459", color: "#24292E" },
+  { name: "Vercel",         asn: "AS16509", color: "#000000" },
+  { name: "Netlify",        asn: "AS54113", color: "#00C7B7" },
+  { name: "Hetzner",        asn: "AS24940", color: "#D50C2D" },
+];
+
+const COUNTRIES = [
+  { code: "US", name: "United States", flag: "🇺🇸" },
+  { code: "DE", name: "Germany",       flag: "🇩🇪" },
+  { code: "GB", name: "United Kingdom",flag: "🇬🇧" },
+  { code: "NL", name: "Netherlands",   flag: "🇳🇱" },
+  { code: "SG", name: "Singapore",     flag: "🇸🇬" },
+  { code: "IE", name: "Ireland",       flag: "🇮🇪" },
+  { code: "FR", name: "France",        flag: "🇫🇷" },
+  { code: "JP", name: "Japan",         flag: "🇯🇵" },
+];
+
+const TECHS = {
+  nginx:     { name: "nginx",           cat: "Server",    v: "1.24.0",  outdated: false },
+  apache:    { name: "Apache",          cat: "Server",    v: "2.4.41",  outdated: true  },
+  react:     { name: "React",           cat: "Frontend",  v: "18.3",    outdated: false },
+  vue:       { name: "Vue.js",          cat: "Frontend",  v: "3.4",     outdated: false },
+  next:      { name: "Next.js",         cat: "Framework", v: "14.2",    outdated: false },
+  wordpress: { name: "WordPress",       cat: "CMS",       v: "6.2",     outdated: true  },
+  rails:     { name: "Rails",           cat: "Framework", v: "7.1",     outdated: false },
+  jquery:    { name: "jQuery",          cat: "Library",   v: "1.12.4",  outdated: true  },
+  bootstrap: { name: "Bootstrap",       cat: "UI",        v: "5.3",     outdated: false },
+  tailwind:  { name: "Tailwind",        cat: "UI",        v: "3.4",     outdated: false },
+  cloudflare:{ name: "Cloudflare",      cat: "CDN",       v: "—",       outdated: false },
+  varnish:   { name: "Varnish",         cat: "Cache",     v: "6.0",     outdated: false },
+  php:       { name: "PHP",             cat: "Lang",      v: "7.4",     outdated: true  },
+  node:      { name: "Node.js",         cat: "Runtime",   v: "20.x",    outdated: false },
+  django:    { name: "Django",          cat: "Framework", v: "4.2",     outdated: false },
+  ga:        { name: "Google Analytics",cat: "Analytics", v: "GA4",     outdated: false },
+  segment:   { name: "Segment",         cat: "Analytics", v: "—",       outdated: false },
+  hubspot:   { name: "HubSpot",         cat: "Marketing", v: "—",       outdated: false },
+};
+
+const SUBS_TEMPLATE = [
+  { sub:"www",       status:200, host:0, country:0, title:"— modern infrastructure for growing teams", techs:["next","react","tailwind","cloudflare","ga"], ports:[80,443], ssl:{issuer:"Let's Encrypt R3",expires:"2026-08-14",grade:"A+"}, risk:12, takeover:false, source:"CT log" },
+  { sub:"api",       status:200, host:1, country:0, title:"— API v3",                                  techs:["node","nginx"],                             ports:[80,443,8080], ssl:{issuer:"DigiCert TLS RSA SHA256",expires:"2026-11-02",grade:"A"}, risk:24, takeover:false, source:"DNS bruteforce" },
+  { sub:"app",       status:200, host:7, country:0, title:"— Console",                                 techs:["react","next","tailwind"],                   ports:[443], ssl:{issuer:"Let's Encrypt R3",expires:"2026-07-21",grade:"A+"}, risk:8, takeover:false, source:"CT log" },
+  { sub:"docs",      status:200, host:6, country:0, title:"— Documentation",                           techs:["next","react"],                             ports:[443], ssl:{issuer:"Let's Encrypt R3",expires:"2026-09-11",grade:"A+"}, risk:5, takeover:false, source:"CT log" },
+  { sub:"blog",      status:200, host:3, country:0, title:"— Blog — engineering & product updates",    techs:["wordpress","php","jquery","apache"],         ports:[80,443], ssl:{issuer:"Sectigo RSA",expires:"2026-04-30",grade:"B"}, risk:78, takeover:false, source:"CT log" },
+  { sub:"status",    status:200, host:8, country:0, title:"— Status",                                  techs:["react","tailwind"],                         ports:[443], ssl:{issuer:"Let's Encrypt R3",expires:"2026-10-05",grade:"A+"}, risk:6, takeover:false, source:"CT log" },
+  { sub:"mail",      status:200, host:5, country:0, title:"Outlook on the web",                        techs:["nginx"],                                    ports:[25,465,587,993], ssl:{issuer:"Microsoft RSA TLS CA",expires:"2026-06-18",grade:"A"}, risk:18, takeover:false, source:"DNS bruteforce" },
+  { sub:"support",   status:200, host:0, country:0, title:"— Help Center",                             techs:["hubspot","react"],                          ports:[443], ssl:{issuer:"Cloudflare Inc ECC CA-3",expires:"2026-12-01",grade:"A+"}, risk:14, takeover:false, source:"CT log" },
+  { sub:"shop",      status:200, host:2, country:0, title:"— Store",                                   techs:["rails","nginx","react"],                    ports:[443], ssl:{issuer:"Google Trust Services",expires:"2026-08-22",grade:"A+"}, risk:22, takeover:false, source:"DNS bruteforce" },
+  { sub:"staging",   status:401, host:4, country:1, title:"—",                                         techs:["nginx"],                                    ports:[443], ssl:{issuer:"Let's Encrypt R3",expires:"2026-05-09",grade:"A"}, risk:56, takeover:false, source:"Brute-force" },
+  { sub:"dev",       status:403, host:4, country:1, title:"—",                                         techs:["nginx"],                                    ports:[22,443], ssl:{issuer:"Let's Encrypt R3",expires:"2026-05-09",grade:"B"}, risk:64, takeover:false, source:"Brute-force" },
+  { sub:"test",      status:200, host:4, country:1, title:"Internal QA",                               techs:["django","nginx"],                           ports:[443,8000], ssl:{issuer:"Let's Encrypt R3",expires:"2026-04-12",grade:"C"}, risk:81, takeover:false, source:"Brute-force" },
+  { sub:"old",       status:0,   host:7, country:0, title:"—",                                         techs:[],                                           ports:[], ssl:null, risk:95, takeover:true, source:"CT log", takeoverNote:"CNAME points to deprovisioned Vercel project" },
+  { sub:"legacy",    status:502, host:9, country:1, title:"Bad Gateway",                               techs:["apache","php"],                             ports:[80,443], ssl:{issuer:"Sectigo RSA",expires:"2025-12-30",grade:"F"}, risk:88, takeover:false, source:"DNS bruteforce" },
+  { sub:"cdn",       status:200, host:0, country:0, title:"—",                                         techs:["cloudflare","varnish"],                     ports:[80,443], ssl:{issuer:"Cloudflare Inc ECC CA-3",expires:"2026-11-14",grade:"A+"}, risk:4, takeover:false, source:"CT log" },
+  { sub:"assets",    status:200, host:1, country:0, title:"—",                                         techs:["nginx"],                                    ports:[443], ssl:{issuer:"Amazon RSA 2048 M02",expires:"2026-09-28",grade:"A"}, risk:9, takeover:false, source:"DNS bruteforce" },
+  { sub:"auth",      status:200, host:5, country:5, title:"Sign in",                                   techs:["react","next"],                             ports:[443], ssl:{issuer:"DigiCert TLS RSA SHA256",expires:"2026-10-19",grade:"A+"}, risk:11, takeover:false, source:"CT log" },
+  { sub:"billing",   status:200, host:2, country:0, title:"— Billing",                                 techs:["rails","nginx"],                            ports:[443], ssl:{issuer:"Google Trust Services",expires:"2026-07-04",grade:"A"}, risk:19, takeover:false, source:"DNS bruteforce" },
+  { sub:"metrics",   status:401, host:4, country:1, title:"—",                                         techs:["nginx"],                                    ports:[443,9090], ssl:{issuer:"Let's Encrypt R3",expires:"2026-06-22",grade:"A"}, risk:38, takeover:false, source:"Brute-force" },
+  { sub:"vpn",       status:200, host:9, country:1, title:"—",                                         techs:[],                                           ports:[443,1194], ssl:{issuer:"Sectigo RSA",expires:"2026-03-15",grade:"B"}, risk:42, takeover:false, source:"Brute-force" },
+  { sub:"ftp",       status:0,   host:9, country:1, title:"—",                                         techs:[],                                           ports:[21], ssl:null, risk:72, takeover:false, source:"Brute-force" },
+  { sub:"jenkins",   status:403, host:4, country:1, title:"—",                                         techs:["apache"],                                   ports:[443,8080], ssl:{issuer:"Let's Encrypt R3",expires:"2026-05-29",grade:"B"}, risk:67, takeover:false, source:"Brute-force" },
+  { sub:"grafana",   status:200, host:4, country:1, title:"Grafana",                                   techs:["nginx"],                                    ports:[443,3000], ssl:{issuer:"Let's Encrypt R3",expires:"2026-08-08",grade:"A"}, risk:33, takeover:false, source:"Brute-force" },
+  { sub:"wiki",      status:200, host:3, country:0, title:"— Internal Wiki",                           techs:["wordpress","php","jquery"],                 ports:[80,443], ssl:{issuer:"Sectigo RSA",expires:"2026-04-18",grade:"B"}, risk:71, takeover:false, source:"DNS bruteforce" },
+  { sub:"careers",   status:200, host:2, country:0, title:"— Careers — open roles",                   techs:["next","react","tailwind","segment"],         ports:[443], ssl:{issuer:"Google Trust Services",expires:"2026-11-23",grade:"A+"}, risk:7, takeover:false, source:"CT log" },
+  { sub:"events",    status:301, host:0, country:0, title:"—",                                         techs:["cloudflare"],                               ports:[443], ssl:{issuer:"Cloudflare Inc ECC CA-3",expires:"2026-12-12",grade:"A+"}, risk:6, takeover:false, source:"CT log" },
+  { sub:"partners",  status:200, host:1, country:0, title:"— Partners",                               techs:["vue","nginx"],                              ports:[443], ssl:{issuer:"Amazon RSA 2048 M02",expires:"2026-09-04",grade:"A"}, risk:17, takeover:false, source:"DNS bruteforce" },
+  { sub:"investors", status:200, host:5, country:5, title:"— Investor Relations",                     techs:["wordpress","php","bootstrap"],              ports:[443], ssl:{issuer:"DigiCert TLS RSA SHA256",expires:"2026-08-30",grade:"A"}, risk:44, takeover:false, source:"CT log" },
+];
+
+function deterministicIp(seed) {
+  let h = 2166136261;
+  for (let i = 0; i < seed.length; i++) { h ^= seed.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return `${((h>>>24)%200)+20}.${(h>>>16)&0xff}.${(h>>>8)&0xff}.${h&0xff}`;
+}
+
+function buildResults(domain) {
+  const label = domain.split(".")[0].charAt(0).toUpperCase() + domain.split(".")[0].slice(1);
+  return SUBS_TEMPLATE.map((s, i) => {
+    const ip = deterministicIp(s.sub + domain);
+    const ipv6 = `2606:4700:${(i*7).toString(16)}::${(i*13).toString(16)}`;
+    const hostObj = HOSTS[s.host];
+    const countryObj = COUNTRIES[s.country] || COUNTRIES[0];
+    const title = s.title.startsWith("—") ? label + s.title : s.title;
+    return {
+      id: i,
+      fqdn: `${s.sub}.${domain}`,
+      sub: s.sub,
+      domain,
+      status: s.status,
+      title,
+      ip, ipv6,
+      host: hostObj,
+      country: countryObj,
+      techs: s.techs.map(t => TECHS[t]),
+      ports: s.ports,
+      ssl: s.ssl,
+      risk: s.risk,
+      takeover: s.takeover,
+      takeoverNote: s.takeoverNote,
+      source: s.source,
+      lastSeen: (i * 47) % 720,
+      dns: {
+        A: [ip],
+        AAAA: [ipv6],
+        CNAME: i%4===0 ? [`${s.sub}.${hostObj.name.toLowerCase().replace(/\s+/g,"-")}.net`] : [],
+        MX: s.sub==="mail" ? ["10 aspmx.l.google.com","20 alt1.aspmx.l.google.com"] : [],
+        TXT: i%5===0 ? [`v=spf1 include:_spf.${domain} ~all`] : [],
+        NS: [`ns1.${domain}`,`ns2.${domain}`],
+      },
+    };
+  });
+}
+
+function buildWhois(domain) {
+  return {
+    domain,
+    registrar: "Gandi SAS",
+    registered: "2014-03-12",
+    expires: "2027-03-12",
+    updated: "2025-11-08",
+    registrant: { org: domain.split(".")[0].charAt(0).toUpperCase()+domain.split(".")[0].slice(1)+" Inc.", country: "US", state: "CA" },
+    nameservers: ["ada.ns.cloudflare.com","barrett.ns.cloudflare.com"],
+    status: ["clientTransferProhibited","serverDeleteProhibited"],
+  };
+}
+
+// ─── Helpers ───────────────────────────────────────────────────────────────
+const { useState, useEffect, useMemo, useRef, useCallback, Fragment } = React;
+
+function statusColor(code) {
+  if (code === 0) return { bg:"var(--gray-100)", fg:"var(--gray-500)", label:"OFFLINE" };
+  if (code >= 200 && code < 300) return { bg:"var(--ok-bg)",   fg:"var(--ok-fg)",   label:code };
+  if (code >= 300 && code < 400) return { bg:"var(--warn-bg)", fg:"var(--warn-fg)", label:code };
+  if (code >= 400 && code < 500) return { bg:"var(--warn-bg)", fg:"var(--warn-fg)", label:code };
+  return { bg:"var(--bad-bg)", fg:"var(--bad-fg)", label:code };
+}
+
+function riskBand(r) {
+  if (r < 20) return { label:"Low",      fg:"var(--ok-fg)",   bg:"var(--ok-bg)"   };
+  if (r < 50) return { label:"Med",      fg:"#A66A00",        bg:"#FFF6E5"        };
+  if (r < 75) return { label:"High",     fg:"#B23A1F",        bg:"#FFEDE5"        };
+  return             { label:"Critical", fg:"var(--bad-fg)",  bg:"var(--bad-bg)"  };
+}
+
+function fmtAgo(min) {
+  if (min < 1) return "just now";
+  if (min < 60) return `${min}m ago`;
+  const h = Math.floor(min/60);
+  if (h < 24) return `${h}h ago`;
+  return `${Math.floor(h/24)}d ago`;
+}
+
+function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+function download(name, content, type) {
+  const blob = new Blob([content], { type });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = name; a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ─── Icons ─────────────────────────────────────────────────────────────────
+const I = {
+  Search:   p => <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.6" {...p}><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5L14 14" strokeLinecap="round"/></svg>,
+  Copy:     p => <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.4" {...p}><rect x="4" y="4" width="9" height="9" rx="1.5"/><path d="M3 11V3a1 1 0 0 1 1-1h7"/></svg>,
+  Check:    p => <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" {...p}><path d="M3 8.5L6.5 12 13 4.5" strokeLinecap="round" strokeLinejoin="round"/></svg>,
+  Chevron:  p => <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.6" {...p}><path d="M5 6.5L8 9.5 11 6.5" strokeLinecap="round" strokeLinejoin="round"/></svg>,
+  Close:    p => <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.6" {...p}><path d="M4 4l8 8M12 4l-8 8" strokeLinecap="round"/></svg>,
+  Download: p => <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="1.5" {...p}><path d="M8 2v8m0 0L5 7.5M8 10l3-2.5" strokeLinecap="round" strokeLinejoin="round"/><path d="M2.5 12.5v1A1.5 1.5 0 0 0 4 15h8a1.5 1.5 0 0 0 1.5-1.5v-1" strokeLinecap="round"/></svg>,
+  Filter:   p => <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="1.5" {...p}><path d="M2 3h12M4 8h8M6 13h4" strokeLinecap="round"/></svg>,
+  Shield:   p => <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="1.5" {...p}><path d="M8 1.5l5.5 2v4.5c0 3.5-2.5 5.5-5.5 6.5-3-1-5.5-3-5.5-6.5V3.5z" strokeLinejoin="round"/></svg>,
+  Warn:     p => <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="1.5" {...p}><path d="M8 2L1.5 13.5h13L8 2z" strokeLinejoin="round"/><path d="M8 6.5v3.5M8 12v.01" strokeLinecap="round"/></svg>,
+  Dot:      p => <svg viewBox="0 0 8 8" width="8" height="8" {...p}><circle cx="4" cy="4" r="3" fill="currentColor"/></svg>,
+  Settings: p => <svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.5" {...p}><circle cx="8" cy="8" r="2.5"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M2.6 2.6l1.4 1.4M12 12l1.4 1.4M13.4 2.6L12 4M4 12l-1.4 1.4" strokeLinecap="round"/></svg>,
+  Moon:     p => <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.5" {...p}><path d="M13.5 10A6 6 0 0 1 6 2.5a6 6 0 1 0 7.5 7.5z" strokeLinejoin="round"/></svg>,
+  Sun:      p => <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.5" {...p}><circle cx="8" cy="8" r="3"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M2.9 2.9l1.4 1.4M11.7 11.7l1.4 1.4M13.1 2.9l-1.4 1.4M4.3 11.7l-1.4 1.4" strokeLinecap="round"/></svg>,
+  Globe:    p => <svg viewBox="0 0 16 16" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.3" {...p}><circle cx="8" cy="8" r="6.5"/><path d="M8 1.5C6.2 3 5 5.4 5 8s1.2 5 3 6.5M8 1.5C9.8 3 11 5.4 11 8s-1.2 5-3 6.5M1.5 8h13" strokeLinecap="round"/></svg>,
+};
+
+// ─── Copy cell ─────────────────────────────────────────────────────────────
+function CopyCell({ text, children, copied, setCopied }) {
+  const isCopied = copied === text;
+  return (
+    <button className={`copy-cell ${isCopied ? "copy-cell-on" : ""}`}
+      onClick={e => { e.stopPropagation(); navigator.clipboard?.writeText(text); setCopied(text); setTimeout(() => setCopied(null), 1100); }}
+      title={`Copy "${text}"`}>
+      <span className="copy-cell-text">{children ?? text}</span>
+      <span className="copy-cell-icon">{isCopied ? <I.Check/> : <I.Copy/>}</span>
+    </button>
+  );
+}
+
+// ─── Scan Progress ─────────────────────────────────────────────────────────
+const SCAN_STAGES = [
+  { key:"dns",  name:"DNS Resolution",    desc:"Querying A, AAAA, CNAME, MX records" },
+  { key:"http", name:"HTTP Probing",      desc:"Checking live status and redirect chains" },
+  { key:"tls",  name:"TLS Analysis",      desc:"Validating certificates and cipher suites" },
+  { key:"fp",   name:"Tech Fingerprint",  desc:"Identifying frameworks and server stacks" },
+];
+
+function ScanProgress({ active, progresses, domain, found }) {
+  return (
+    <div className="scan">
+      <div className="scan-head">
+        <div className="scan-title">
+          <span className="scan-spinner"/>
+          Scanning <strong>{domain}</strong>
+        </div>
+        <div className="scan-found">{found} subdomains found</div>
+      </div>
+      <div className="scan-stages">
+        {SCAN_STAGES.map((s, i) => {
+          const state = i < active ? "done" : i === active ? "running" : "pending";
+          return (
+            <div key={s.key} className={`stage stage-${state}`}>
+              <div className="stage-dot">
+                {state === "done"    && <I.Check/>}
+                {state === "running" && <span className="stage-spinner"/>}
+                {state === "pending" && <span className="stage-pending-dot"/>}
+              </div>
+              <div className="stage-body">
+                <div className="stage-name">{s.name}</div>
+                <div className="stage-desc">{s.desc}</div>
+              </div>
+              <div className="stage-meter">
+                <div className={`stage-bar stage-bar-${state}`}
+                  style={{ width: state==="done" ? "100%" : state==="running" ? `${progresses[i]}%` : "0%" }}/>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─── Search bar ────────────────────────────────────────────────────────────
+function SearchBar({ value, onChange, onScan, scanning }) {
+  return (
+    <div className="search-wrap">
+      <div className={`search ${scanning ? "search-scanning" : ""}`}>
+        <I.Search className="search-icon"/>
+        <input className="search-input"
+          placeholder="Enter a domain (e.g. acme.io)"
+          value={value}
+          onChange={e => onChange(e.target.value)}
+          onKeyDown={e => e.key === "Enter" && onScan()}
+          disabled={scanning}/>
+        <button className="search-btn" onClick={onScan} disabled={scanning || !value.trim()}>
+          {scanning ? "Scanning…" : "Scan"}
+        </button>
+      </div>
+      <div className="search-hint">
+        Try:{" "}
+        {["acme.io","globex.com","initech.dev"].map((d,i) => (
+          <Fragment key={d}>
+            {i > 0 && ", "}
+            <button className="link" onClick={() => onChange(d)}>{d}</button>
+          </Fragment>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── Stat tiles ─────────────────────────────────────────────────────────────
+function StatTiles({ rows }) {
+  const live     = rows.filter(r => r.status >= 200 && r.status < 400).length;
+  const offline  = rows.filter(r => r.status === 0).length;
+  const errors   = rows.filter(r => r.status >= 400).length;
+  const high     = rows.filter(r => r.risk >= 50).length;
+  const takeovers= rows.filter(r => r.takeover).length;
+  const tiles = [
+    { label:"Total subdomains", value:rows.length,  accent:"var(--accent)" },
+    { label:"Live (2xx/3xx)",   value:live,          accent:"var(--ok-fg)" },
+    { label:"Errors (4xx/5xx)", value:errors,        accent:"#B23A1F" },
+    { label:"Offline",          value:offline,       accent:"var(--gray-500)" },
+    { label:"High risk",        value:high,          accent:"#A66A00" },
+    { label:"Takeover risks",   value:takeovers,     accent:"var(--bad-fg)" },
+  ];
+  return (
+    <div className="tiles">
+      {tiles.map(t => (
+        <div key={t.label} className="tile">
+          <div className="tile-val" style={{ color:t.accent }}>{t.value}</div>
+          <div className="tile-label">{t.label}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ─── Toolbar ────────────────────────────────────────────────────────────────
+const ALL_COLUMNS = [
+  { key:"sub",     label:"Subdomain" },
+  { key:"status",  label:"Status" },
+  { key:"ip",      label:"IP Address" },
+  { key:"host",    label:"Hosting" },
+  { key:"country", label:"Country" },
+  { key:"title",   label:"Page Title" },
+  { key:"techs",   label:"Tech Stack" },
+  { key:"ports",   label:"Open Ports" },
+  { key:"ssl",     label:"SSL Grade" },
+  { key:"risk",    label:"Risk Score" },
+  { key:"seen",    label:"Last Seen" },
+];
+
+function Toolbar({ filters, setFilters, allCountries, allTechs, onExport, columns, setColumns, count, total }) {
+  const [openMenu, setOpenMenu] = useState(null);
+  const ref = useRef(null);
+  useEffect(() => {
+    function handler(e) { if (ref.current && !ref.current.contains(e.target)) setOpenMenu(null); }
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const statusOpts = [
+    { v:"all",     l:"All statuses" },
+    { v:"live",    l:"Live (2xx/3xx)" },
+    { v:"error",   l:"Errors (4xx/5xx)" },
+    { v:"offline", l:"Offline" },
+  ];
+
+  return (
+    <div className="toolbar" ref={ref}>
+      <div className="toolbar-left">
+        <input className="filter-search" placeholder="Filter rows…"
+          value={filters.q} onChange={e => setFilters({...filters, q:e.target.value})}/>
+
+        <div className="dd">
+          <button className={`chip ${filters.status!=="all"?"chip-active":""}`}
+            onClick={() => setOpenMenu(openMenu==="status" ? null : "status")}>
+            {statusOpts.find(s=>s.v===filters.status).l} <I.Chevron/>
+          </button>
+          {openMenu === "status" && (
+            <div className="dd-menu">
+              {statusOpts.map(o => (
+                <button key={o.v} className={`dd-item ${filters.status===o.v?"dd-item-active":""}`}
+                  onClick={() => { setFilters({...filters, status:o.v}); setOpenMenu(null); }}>
+                  {o.l} {filters.status===o.v && <I.Check/>}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="dd">
+          <button className={`chip ${filters.country!=="all"?"chip-active":""}`}
+            onClick={() => setOpenMenu(openMenu==="country" ? null : "country")}>
+            Country{filters.country!=="all" ? `: ${filters.country}` : ""} <I.Chevron/>
+          </button>
+          {openMenu === "country" && (
+            <div className="dd-menu dd-menu-scroll">
+              <button className={`dd-item ${filters.country==="all"?"dd-item-active":""}`}
+                onClick={() => { setFilters({...filters, country:"all"}); setOpenMenu(null); }}>
+                All countries {filters.country==="all" && <I.Check/>}
+              </button>
+              {allCountries.map(c => (
+                <button key={c.code} className={`dd-item ${filters.country===c.code?"dd-item-active":""}`}
+                  onClick={() => { setFilters({...filters, country:c.code}); setOpenMenu(null); }}>
+                  <span className="flag">{c.flag}</span> {c.name} {filters.country===c.code && <I.Check/>}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="dd">
+          <button className={`chip ${filters.tech!=="all"?"chip-active":""}`}
+            onClick={() => setOpenMenu(openMenu==="tech" ? null : "tech")}>
+            Tech{filters.tech!=="all" ? `: ${filters.tech}` : ""} <I.Chevron/>
+          </button>
+          {openMenu === "tech" && (
+            <div className="dd-menu dd-menu-scroll">
+              <button className={`dd-item ${filters.tech==="all"?"dd-item-active":""}`}
+                onClick={() => { setFilters({...filters, tech:"all"}); setOpenMenu(null); }}>
+                All technologies {filters.tech==="all" && <I.Check/>}
+              </button>
+              {allTechs.map(t => (
+                <button key={t.name} className={`dd-item ${filters.tech===t.name?"dd-item-active":""}`}
+                  onClick={() => { setFilters({...filters, tech:t.name}); setOpenMenu(null); }}>
+                  {t.name} {filters.tech===t.name && <I.Check/>}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <button className={`chip ${filters.takeoverOnly?"chip-active chip-bad":""}`}
+          onClick={() => setFilters({...filters, takeoverOnly:!filters.takeoverOnly})}>
+          <I.Warn/> Takeover risks
+        </button>
+      </div>
+
+      <div className="toolbar-right">
+        <div className="row-count">{count}<span className="muted">/{total}</span></div>
+
+        <div className="dd">
+          <button className="chip" onClick={() => setOpenMenu(openMenu==="cols"?null:"cols")}>
+            <I.Filter/> Columns
+          </button>
+          {openMenu === "cols" && (
+            <div className="dd-menu dd-menu-right">
+              {ALL_COLUMNS.map(c => (
+                <label key={c.key} className="dd-check">
+                  <input type="checkbox" checked={columns.includes(c.key)}
+                    onChange={e => {
+                      if (e.target.checked) setColumns([...columns, c.key]);
+                      else setColumns(columns.filter(x=>x!==c.key));
+                    }}/>
+                  <span>{c.label}</span>
+                </label>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="dd">
+          <button className="chip chip-primary" onClick={() => setOpenMenu(openMenu==="export"?null:"export")}>
+            <I.Download/> Export
+          </button>
+          {openMenu === "export" && (
+            <div className="dd-menu dd-menu-right">
+              <button className="dd-item" onClick={() => { onExport("csv"); setOpenMenu(null); }}>Export as CSV</button>
+              <button className="dd-item" onClick={() => { onExport("json"); setOpenMenu(null); }}>Export as JSON</button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Sortable th ─────────────────────────────────────────────────────────────
+function Th({ id, label, sort, setSort, align, w }) {
+  const active = sort.key === id;
+  return (
+    <th className={`th th-${align||"left"}`} style={w?{width:w}:null}
+      onClick={() => setSort({ key:id, dir:active && sort.dir==="asc" ? "desc" : "asc" })}>
+      <span className="th-label">{label}</span>
+      {active && <span className="th-arrow">{sort.dir==="asc" ? "↑" : "↓"}</span>}
+    </th>
+  );
+}
+
+// ─── Screenshot placeholder ──────────────────────────────────────────────────
+function ScreenshotPlaceholder({ r }) {
+  const hash = r.fqdn.split("").reduce((a,c)=>a+c.charCodeAt(0),0);
+  const hue = (hash * 13) % 360;
+  return (
+    <div className="shot-inner" style={{"--shot-hue":hue}}>
+      <div className="shot-chrome">
+        <span className="shot-dot"/><span className="shot-dot"/><span className="shot-dot"/>
+        <span className="shot-url">https://{r.fqdn}</span>
+      </div>
+      <div className="shot-body">
+        <div className="shot-title">{r.title}</div>
+        <div className="shot-line shot-line-1"/>
+        <div className="shot-line shot-line-2"/>
+        <div className="shot-line shot-line-3"/>
+        <div className="shot-grid"><div/><div/><div/></div>
+        <div className="shot-watermark">screenshot placeholder · {r.fqdn}</div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Detail panel (in-row) ──────────────────────────────────────────────────
+function DetailPanel({ r, copied, setCopied, onOpen }) {
+  const rb = riskBand(r.risk);
+  return (
+    <div className="detail">
+      <div className="detail-grid">
+        {/* Screenshot */}
+        <div className="card card-shot">
+          <div className="card-head">
+            <div className="card-title">Page preview</div>
+            <button className="card-link" onClick={e=>{e.stopPropagation();onOpen(r);}}>Open detail →</button>
+          </div>
+          <div className="shot">
+            {r.status >= 200 && r.status < 400
+              ? <ScreenshotPlaceholder r={r}/>
+              : <div className="shot-empty">
+                  <I.Warn/>
+                  No preview available
+                  <span className="muted">{r.status===0 ? "Host did not respond" : `HTTP ${r.status}`}</span>
+                </div>
+            }
+          </div>
+        </div>
+
+        {/* Risk */}
+        <div className="card">
+          <div className="card-head">
+            <div className="card-title">Risk assessment</div>
+            <span className="pill" style={{background:rb.bg,color:rb.fg}}>{rb.label} · {r.risk}/100</span>
+          </div>
+          <div className="risk-list">
+            {r.takeover && (
+              <div className="risk-item risk-item-bad">
+                <I.Warn/>
+                <div>
+                  <div className="risk-item-title">Subdomain takeover possible</div>
+                  <div className="risk-item-desc">{r.takeoverNote}</div>
+                </div>
+              </div>
+            )}
+            {r.techs.filter(t=>t.outdated).map(t => (
+              <div key={t.name} className="risk-item">
+                <I.Warn/>
+                <div>
+                  <div className="risk-item-title">{t.name} {t.v} is outdated</div>
+                  <div className="risk-item-desc">Known CVEs published since this version. Recommend upgrade.</div>
+                </div>
+              </div>
+            ))}
+            {r.ssl && ["B","C","F"].includes(r.ssl.grade) && (
+              <div className="risk-item">
+                <I.Shield/>
+                <div>
+                  <div className="risk-item-title">Weak TLS configuration ({r.ssl.grade})</div>
+                  <div className="risk-item-desc">Issuer: {r.ssl.issuer} · Expires {r.ssl.expires}</div>
+                </div>
+              </div>
+            )}
+            {r.ports.some(p=>[21,22,8080,9090,3000].includes(p)) && (
+              <div className="risk-item">
+                <I.Shield/>
+                <div>
+                  <div className="risk-item-title">Sensitive ports exposed</div>
+                  <div className="risk-item-desc">Ports {r.ports.filter(p=>[21,22,8080,9090,3000].includes(p)).join(", ")} are reachable.</div>
+                </div>
+              </div>
+            )}
+            {!r.takeover && r.techs.every(t=>!t.outdated) && (!r.ssl||["A","A+"].includes(r.ssl.grade)) && !r.ports.some(p=>[21,22,8080,9090,3000].includes(p)) && (
+              <div className="risk-item risk-item-ok">
+                <I.Check/>
+                <div>
+                  <div className="risk-item-title">No critical findings</div>
+                  <div className="risk-item-desc">Configuration looks healthy.</div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* DNS */}
+        <div className="card">
+          <div className="card-head"><div className="card-title">DNS records</div></div>
+          <div className="dns">
+            {Object.entries(r.dns).map(([type, vals]) => (
+              <div key={type} className="dns-row">
+                <span className="dns-type">{type}</span>
+                <div className="dns-vals">
+                  {vals.length === 0
+                    ? <span className="muted">—</span>
+                    : vals.map((v,i) => <CopyCell key={i} text={v} copied={copied} setCopied={setCopied}/>)
+                  }
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* TLS + ports */}
+        <div className="card">
+          <div className="card-head"><div className="card-title">TLS &amp; ports</div></div>
+          {r.ssl ? (
+            <div className="kv">
+              <div className="kv-row"><span className="kv-k">Grade</span><span className={`ssl ssl-${r.ssl.grade.replace("+","p")}`}>{r.ssl.grade}</span></div>
+              <div className="kv-row"><span className="kv-k">Issuer</span><span>{r.ssl.issuer}</span></div>
+              <div className="kv-row"><span className="kv-k">Expires</span><span>{r.ssl.expires}</span></div>
+            </div>
+          ) : <div className="muted small" style={{marginBottom:10}}>No TLS observed.</div>}
+          <div className="ports-row">
+            <span className="kv-k">Open ports</span>
+            <div className="ports-list">
+              {r.ports.length === 0 ? <span className="muted">—</span> : r.ports.map(p => (
+                <span key={p} className={`port ${[21,22,8080,9090,3000].includes(p)?"port-warn":""}`}>{p}</span>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Tech stack */}
+        <div className="card card-wide">
+          <div className="card-head"><div className="card-title">Technology stack</div></div>
+          {r.techs.length === 0
+            ? <div className="muted small">No technologies fingerprinted.</div>
+            : <div className="tech-grid">
+                {r.techs.map(t => (
+                  <div key={t.name} className={`tech-card ${t.outdated?"tech-card-warn":""}`}>
+                    <div className="tech-card-name">{t.name}{t.outdated && <I.Warn/>}</div>
+                    <div className="tech-card-meta">{t.cat} · {t.v}</div>
+                  </div>
+                ))}
+              </div>
+          }
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Table row ──────────────────────────────────────────────────────────────
+function TableRow({ r, expanded, onToggle, columns, copied, setCopied, onOpen }) {
+  const sc = statusColor(r.status);
+  const rb = riskBand(r.risk);
+  const has = k => columns.includes(k);
+  return (
+    <Fragment>
+      <tr className={`row ${expanded?"row-expanded":""}`} onClick={onToggle}>
+        <td className="td td-chevron">
+          <span className={`chev ${expanded?"chev-open":""}`}><I.Chevron/></span>
+        </td>
+        {has("sub") && (
+          <td className="td">
+            <div className="sub-cell">
+              <span className="sub-name">{r.sub}</span>
+              <span className="sub-domain">.{r.domain}</span>
+              {r.takeover && <span className="badge badge-bad"><I.Warn/> takeover</span>}
+            </div>
+          </td>
+        )}
+        {has("status") && (
+          <td className="td">
+            <span className="pill" style={{background:sc.bg,color:sc.fg}}>
+              <I.Dot/> {sc.label}
+            </span>
+          </td>
+        )}
+        {has("ip") && (
+          <td className="td">
+            <CopyCell text={r.ip} copied={copied} setCopied={setCopied}/>
+          </td>
+        )}
+        {has("host") && (
+          <td className="td">
+            <div className="host-cell">
+              <span className="host-dot" style={{background:r.host.color}}/>
+              <span>{r.host.name}</span>
+            </div>
+          </td>
+        )}
+        {has("country") && (
+          <td className="td">
+            <span className="flag">{r.country.flag}</span>
+            <span className="country-name">{r.country.code}</span>
+          </td>
+        )}
+        {has("title") && (
+          <td className="td td-title">
+            <span className="title-text" title={r.title}>
+              {r.title === "—" ? <span className="muted">—</span> : r.title}
+            </span>
+          </td>
+        )}
+        {has("techs") && (
+          <td className="td">
+            {r.techs.length === 0 ? <span className="muted">—</span> : (
+              <div className="techs">
+                {r.techs.slice(0,3).map(t => (
+                  <span key={t.name} className={`tech ${t.outdated?"tech-outdated":""}`}
+                    title={`${t.name} ${t.v}${t.outdated?" · outdated":""}`}>
+                    {t.outdated && <I.Warn/>}{t.name}
+                  </span>
+                ))}
+                {r.techs.length > 3 && <span className="tech tech-more">+{r.techs.length-3}</span>}
+              </div>
+            )}
+          </td>
+        )}
+        {has("ports") && (
+          <td className="td">
+            {r.ports.length === 0 ? <span className="muted">—</span> : r.ports.join(", ")}
+          </td>
+        )}
+        {has("ssl") && (
+          <td className="td">
+            {r.ssl
+              ? <span className={`ssl ssl-${r.ssl.grade.replace("+","p")}`}>{r.ssl.grade}</span>
+              : <span className="muted">—</span>
+            }
+          </td>
+        )}
+        {has("risk") && (
+          <td className="td">
+            <div className="risk-cell">
+              <div className="risk-bar">
+                <div className="risk-bar-fill" style={{width:`${r.risk}%`,background:rb.fg}}/>
+              </div>
+              <span className="risk-num" style={{color:rb.fg}}>{r.risk}</span>
+            </div>
+          </td>
+        )}
+        {has("seen") && (
+          <td className="td muted">{fmtAgo(r.lastSeen)}</td>
+        )}
+      </tr>
+      {expanded && (
+        <tr className="row-detail-tr">
+          <td colSpan={columns.length + 1}>
+            <DetailPanel r={r} copied={copied} setCopied={setCopied} onOpen={onOpen}/>
+          </td>
+        </tr>
+      )}
+    </Fragment>
+  );
+}
+
+// ─── Detail modal (side sheet) ──────────────────────────────────────────────
+function DetailModal({ r, whois, onClose, copied, setCopied }) {
+  const rb = riskBand(r.risk);
+  const sc = statusColor(r.status);
+  useEffect(() => {
+    function handler(e) { if (e.key === "Escape") onClose(); }
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [onClose]);
+
+  return (
+    <div className="modal-backdrop" onClick={e => { if (e.target===e.currentTarget) onClose(); }}>
+      <div className="modal-sheet" onClick={e=>e.stopPropagation()}>
+        <div className="modal-header">
+          <div>
+            <div className="modal-title">{r.fqdn}</div>
+            <div className="modal-subtitle">
+              <span className="pill" style={{background:sc.bg,color:sc.fg,fontSize:11}}><I.Dot/> {sc.label}</span>
+              {" "}&nbsp;
+              <span className="pill" style={{background:rb.bg,color:rb.fg,fontSize:11}}>{rb.label} risk · {r.risk}/100</span>
+            </div>
+          </div>
+          <button className="icon-btn" onClick={onClose}><I.Close/></button>
+        </div>
+
+        <div className="modal-body">
+          {/* Overview */}
+          <div className="modal-section">
+            <div className="modal-section-title">Overview</div>
+            <div className="modal-kv">
+              <span className="modal-kv-k">FQDN</span>
+              <span className="modal-kv-v"><CopyCell text={r.fqdn} copied={copied} setCopied={setCopied}/></span>
+              <span className="modal-kv-k">IPv4</span>
+              <span className="modal-kv-v"><CopyCell text={r.ip} copied={copied} setCopied={setCopied}/></span>
+              <span className="modal-kv-k">IPv6</span>
+              <span className="modal-kv-v" style={{fontFamily:"ui-monospace,monospace",fontSize:11}}>
+                <CopyCell text={r.ipv6} copied={copied} setCopied={setCopied}/>
+              </span>
+              <span className="modal-kv-k">Hosting</span>
+              <span className="modal-kv-v">
+                <div className="host-cell">
+                  <span className="host-dot" style={{background:r.host.color}}/>
+                  {r.host.name} <span className="muted" style={{fontSize:11}}>{r.host.asn}</span>
+                </div>
+              </span>
+              <span className="modal-kv-k">Country</span>
+              <span className="modal-kv-v"><span className="flag">{r.country.flag}</span> {r.country.name}</span>
+              <span className="modal-kv-k">Page title</span>
+              <span className="modal-kv-v">{r.title}</span>
+              <span className="modal-kv-k">Source</span>
+              <span className="modal-kv-v muted">{r.source}</span>
+              <span className="modal-kv-k">Last seen</span>
+              <span className="modal-kv-v">{fmtAgo(r.lastSeen)}</span>
+            </div>
+          </div>
+
+          {/* TLS */}
+          <div className="modal-section">
+            <div className="modal-section-title">TLS Certificate</div>
+            {r.ssl ? (
+              <div className="modal-kv">
+                <span className="modal-kv-k">Grade</span>
+                <span><span className={`ssl ssl-${r.ssl.grade.replace("+","p")}`}>{r.ssl.grade}</span></span>
+                <span className="modal-kv-k">Issuer</span>
+                <span className="modal-kv-v">{r.ssl.issuer}</span>
+                <span className="modal-kv-k">Expires</span>
+                <span className="modal-kv-v">{r.ssl.expires}</span>
+              </div>
+            ) : <div className="muted small">No TLS certificate observed.</div>}
+          </div>
+
+          {/* Open ports */}
+          <div className="modal-section">
+            <div className="modal-section-title">Open Ports</div>
+            <div className="ports-list">
+              {r.ports.length === 0
+                ? <span className="muted">No open ports detected.</span>
+                : r.ports.map(p => (
+                    <span key={p} className={`port ${[21,22,8080,9090,3000].includes(p)?"port-warn":""}`}>{p}</span>
+                  ))
+              }
+            </div>
+          </div>
+
+          {/* DNS */}
+          <div className="modal-section">
+            <div className="modal-section-title">DNS Records</div>
+            <div className="dns">
+              {Object.entries(r.dns).map(([type, vals]) => (
+                <div key={type} className="dns-row">
+                  <span className="dns-type">{type}</span>
+                  <div className="dns-vals">
+                    {vals.length === 0
+                      ? <span className="muted">—</span>
+                      : vals.map((v,i) => <CopyCell key={i} text={v} copied={copied} setCopied={setCopied}/>)
+                    }
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Tech stack */}
+          <div className="modal-section">
+            <div className="modal-section-title">Technology Stack</div>
+            {r.techs.length === 0
+              ? <div className="muted small">No technologies fingerprinted.</div>
+              : <div className="tech-grid">
+                  {r.techs.map(t => (
+                    <div key={t.name} className={`tech-card ${t.outdated?"tech-card-warn":""}`}>
+                      <div className="tech-card-name">{t.name}{t.outdated && <I.Warn/>}</div>
+                      <div className="tech-card-meta">{t.cat} · {t.v}</div>
+                    </div>
+                  ))}
+                </div>
+            }
+          </div>
+
+          {/* Risk */}
+          <div className="modal-section">
+            <div className="modal-section-title">Risk Assessment</div>
+            <div className="risk-list">
+              {r.takeover && (
+                <div className="risk-item risk-item-bad">
+                  <I.Warn/>
+                  <div>
+                    <div className="risk-item-title">Subdomain takeover possible</div>
+                    <div className="risk-item-desc">{r.takeoverNote}</div>
+                  </div>
+                </div>
+              )}
+              {r.techs.filter(t=>t.outdated).map(t => (
+                <div key={t.name} className="risk-item">
+                  <I.Warn/>
+                  <div>
+                    <div className="risk-item-title">{t.name} {t.v} is outdated</div>
+                    <div className="risk-item-desc">Known CVEs exist for this version. Upgrade recommended.</div>
+                  </div>
+                </div>
+              ))}
+              {r.ssl && ["B","C","F"].includes(r.ssl.grade) && (
+                <div className="risk-item">
+                  <I.Shield/>
+                  <div>
+                    <div className="risk-item-title">Weak TLS configuration (grade {r.ssl.grade})</div>
+                    <div className="risk-item-desc">Issuer: {r.ssl.issuer} · Expires {r.ssl.expires}</div>
+                  </div>
+                </div>
+              )}
+              {r.ports.some(p=>[21,22,8080,9090,3000].includes(p)) && (
+                <div className="risk-item">
+                  <I.Shield/>
+                  <div>
+                    <div className="risk-item-title">Sensitive ports exposed</div>
+                    <div className="risk-item-desc">Ports {r.ports.filter(p=>[21,22,8080,9090,3000].includes(p)).join(", ")} reachable publicly.</div>
+                  </div>
+                </div>
+              )}
+              {!r.takeover && r.techs.every(t=>!t.outdated) && (!r.ssl||["A","A+"].includes(r.ssl.grade)) && !r.ports.some(p=>[21,22,8080,9090,3000].includes(p)) && (
+                <div className="risk-item risk-item-ok">
+                  <I.Check/>
+                  <div>
+                    <div className="risk-item-title">No critical findings</div>
+                    <div className="risk-item-desc">Configuration looks healthy.</div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* WHOIS */}
+          {whois && (
+            <div className="modal-section">
+              <div className="modal-section-title">WHOIS — {whois.domain}</div>
+              <div className="modal-kv">
+                <span className="modal-kv-k">Registrar</span>
+                <span className="modal-kv-v">{whois.registrar}</span>
+                <span className="modal-kv-k">Registered</span>
+                <span className="modal-kv-v">{whois.registered}</span>
+                <span className="modal-kv-k">Expires</span>
+                <span className="modal-kv-v">{whois.expires}</span>
+                <span className="modal-kv-k">Updated</span>
+                <span className="modal-kv-v">{whois.updated}</span>
+                <span className="modal-kv-k">Registrant</span>
+                <span className="modal-kv-v">{whois.registrant.org} · {whois.registrant.state}, {whois.registrant.country}</span>
+                <span className="modal-kv-k">Nameservers</span>
+                <span className="modal-kv-v">{whois.nameservers.join(", ")}</span>
+                <span className="modal-kv-k">Status</span>
+                <span className="modal-kv-v">{whois.status.join(", ")}</span>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Settings panel ──────────────────────────────────────────────────────────
+function SettingsPanel({ theme, setTheme, density, setDensity, onClose }) {
+  return (
+    <div className="modal-backdrop" onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
+      <div className="modal-sheet" style={{width:320}} onClick={e=>e.stopPropagation()}>
+        <div className="modal-header">
+          <div><div className="modal-title">Settings</div></div>
+          <button className="icon-btn" onClick={onClose}><I.Close/></button>
+        </div>
+        <div className="modal-body" style={{gap:24}}>
+          <div className="modal-section">
+            <div className="modal-section-title">Appearance</div>
+            <div style={{display:"flex",flexDirection:"column",gap:12}}>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                <span style={{fontSize:13}}>Theme</span>
+                <div style={{display:"flex",gap:6}}>
+                  {["light","dark"].map(t => (
+                    <button key={t} onClick={()=>setTheme(t)}
+                      style={{
+                        height:30,padding:"0 12px",borderRadius:6,fontSize:12,fontWeight:600,
+                        border:`1.5px solid ${theme===t?"var(--accent)":"var(--border)"}`,
+                        background:theme===t?"var(--accent-light)":"var(--surface)",
+                        color:theme===t?"var(--accent)":"var(--fg-2)",
+                        display:"flex",alignItems:"center",gap:5
+                      }}>
+                      {t==="dark" ? <I.Moon/> : <I.Sun/>} {t.charAt(0).toUpperCase()+t.slice(1)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                <span style={{fontSize:13}}>Table density</span>
+                <div style={{display:"flex",gap:6}}>
+                  {["compact","comfortable"].map(d => (
+                    <button key={d} onClick={()=>setDensity(d)}
+                      style={{
+                        height:30,padding:"0 12px",borderRadius:6,fontSize:12,fontWeight:600,
+                        border:`1.5px solid ${density===d?"var(--accent)":"var(--border)"}`,
+                        background:density===d?"var(--accent-light)":"var(--surface)",
+                        color:density===d?"var(--accent)":"var(--fg-2)",
+                      }}>
+                      {d.charAt(0).toUpperCase()+d.slice(1)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Main App ───────────────────────────────────────────────────────────────
+function App() {
+  const [domain, setDomain]     = useState("");
+  const [scanning, setScanning] = useState(false);
+  const [scanActive, setScanActive]     = useState(-1);
+  const [scanProgresses, setScanProgresses] = useState([0,0,0,0]);
+  const [foundCount, setFoundCount]     = useState(0);
+  const [results, setResults]   = useState(null);
+  const [whois, setWhois]       = useState(null);
+  const [expanded, setExpanded] = useState(null);
+  const [openDetail, setOpenDetail] = useState(null);
+  const [showSettings, setShowSettings] = useState(false);
+  const [copied, setCopied]     = useState(null);
+  const [theme, setTheme]       = useState("light");
+  const [density, setDensity]   = useState("comfortable");
+  const [sort, setSort]         = useState({ key:"risk", dir:"desc" });
+  const [filters, setFilters]   = useState({ q:"", status:"all", country:"all", tech:"all", takeoverOnly:false });
+  const [columns, setColumns]   = useState(["sub","status","ip","host","country","title","techs","ports","ssl","risk","seen"]);
+
+  // Apply theme/density to document
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", theme);
+    document.documentElement.setAttribute("data-density", density);
+  }, [theme, density]);
+
+  const startScan = useCallback(async () => {
+    const d = domain.trim();
+    if (!d) return;
+    setScanning(true);
+    setScanActive(-1);
+    setScanProgresses([0,0,0,0]);
+    setFoundCount(0);
+    setResults(null);
+    setWhois(null);
+    setExpanded(null);
+
+    const total = SUBS_TEMPLATE.length;
+
+    for (let si = 0; si < SCAN_STAGES.length; si++) {
+      setScanActive(si);
+      for (let p = 0; p <= 100; p += 4) {
+        await delay(25);
+        setScanProgresses(prev => { const n=[...prev]; n[si]=p; return n; });
+        const revealed = Math.floor(((si * 100 + p) / (SCAN_STAGES.length * 100)) * total);
+        setFoundCount(revealed);
+      }
+    }
+
+    const built = buildResults(d);
+    setFoundCount(total);
+    await delay(200);
+    setResults(built);
+    setWhois(buildWhois(d));
+    setScanning(false);
+    setScanActive(-1);
+  }, [domain]);
+
+  // Derived: filter + sort
+  const filteredRows = useMemo(() => {
+    if (!results) return [];
+    let rows = results;
+    const q = filters.q.toLowerCase();
+    if (q) rows = rows.filter(r =>
+      r.fqdn.includes(q) ||
+      r.title.toLowerCase().includes(q) ||
+      r.ip.includes(q) ||
+      r.host.name.toLowerCase().includes(q) ||
+      r.techs.some(t => t.name.toLowerCase().includes(q))
+    );
+    if (filters.status === "live")    rows = rows.filter(r => r.status >= 200 && r.status < 400);
+    if (filters.status === "error")   rows = rows.filter(r => r.status >= 400);
+    if (filters.status === "offline") rows = rows.filter(r => r.status === 0);
+    if (filters.country !== "all")    rows = rows.filter(r => r.country.code === filters.country);
+    if (filters.tech !== "all")       rows = rows.filter(r => r.techs.some(t => t.name === filters.tech));
+    if (filters.takeoverOnly)         rows = rows.filter(r => r.takeover);
+
+    return [...rows].sort((a, b) => {
+      let av, bv;
+      if (sort.key === "sub")     { av = a.fqdn;         bv = b.fqdn; }
+      else if (sort.key==="host") { av = a.host.name;    bv = b.host.name; }
+      else if (sort.key==="country"){av=a.country.name;  bv=b.country.name; }
+      else if (sort.key==="ssl")  { av=a.ssl?.grade||"Z";bv=b.ssl?.grade||"Z"; }
+      else if (sort.key==="techs"){ av=a.techs.length;   bv=b.techs.length; }
+      else if (sort.key==="ports"){ av=a.ports.length;   bv=b.ports.length; }
+      else if (sort.key==="seen") { av=a.lastSeen;       bv=b.lastSeen; }
+      else { av = a[sort.key] ?? 0; bv = b[sort.key] ?? 0; }
+      if (typeof av === "string") { av = av.toLowerCase(); bv = bv.toLowerCase(); }
+      if (av < bv) return sort.dir === "asc" ? -1 : 1;
+      if (av > bv) return sort.dir === "asc" ? 1 : -1;
+      return 0;
+    });
+  }, [results, filters, sort]);
+
+  // Unique countries/techs for filter dropdowns
+  const allCountries = useMemo(() => {
+    if (!results) return [];
+    const seen = new Set();
+    return results.filter(r => { if (seen.has(r.country.code)) return false; seen.add(r.country.code); return true; }).map(r=>r.country);
+  }, [results]);
+
+  const allTechs = useMemo(() => {
+    if (!results) return [];
+    const seen = new Set();
+    const techs = [];
+    results.forEach(r => r.techs.forEach(t => { if (!seen.has(t.name)) { seen.add(t.name); techs.push(t); } }));
+    return techs;
+  }, [results]);
+
+  function handleExport(format) {
+    const data = filteredRows.map(r => ({
+      subdomain: r.fqdn,
+      ip: r.ip,
+      status: r.status,
+      hosting: r.host.name,
+      country: r.country.name,
+      title: r.title,
+      risk_score: r.risk,
+      techs: r.techs.map(t=>t.name).join("; "),
+      ports: r.ports.join(", "),
+      ssl_grade: r.ssl?.grade || "—",
+      last_seen: fmtAgo(r.lastSeen),
+    }));
+    if (format === "json") {
+      download("subdomains.json", JSON.stringify(data, null, 2), "application/json");
+    } else {
+      const headers = Object.keys(data[0]);
+      const csv = [headers.join(","), ...data.map(row => headers.map(h => JSON.stringify(row[h]??"")||"").join(","))].join("\n");
+      download("subdomains.csv", csv, "text/csv");
+    }
+  }
+
+  const thProps = { sort, setSort };
+
+  return (
+    <div className="app">
+      {/* Header */}
+      <header className="app-header">
+        <a className="header-brand" href="#">
+          <div className="header-brand-icon">
+            <I.Globe style={{width:16,height:16}}/>
+          </div>
+          <div>
+            <div>SubSentry</div>
+            <div className="header-brand-sub">Subdomain Discovery &amp; Risk Scanner</div>
+          </div>
+        </a>
+        <div className="header-actions">
+          <button className="icon-btn" title="Toggle theme"
+            onClick={() => setTheme(t => t==="light"?"dark":"light")}>
+            {theme==="dark" ? <I.Sun/> : <I.Moon/>}
+          </button>
+          <button className="icon-btn" title="Settings" onClick={() => setShowSettings(true)}>
+            <I.Settings/>
+          </button>
+        </div>
+      </header>
+
+      {/* Main */}
+      <main className="app-main">
+        <SearchBar value={domain} onChange={setDomain} onScan={startScan} scanning={scanning}/>
+
+        {scanning && (
+          <ScanProgress
+            active={scanActive}
+            progresses={scanProgresses}
+            domain={domain.trim()}
+            found={foundCount}
+          />
+        )}
+
+        {results && !scanning && (
+          <>
+            <StatTiles rows={results}/>
+
+            <Toolbar
+              filters={filters}
+              setFilters={setFilters}
+              allCountries={allCountries}
+              allTechs={allTechs}
+              onExport={handleExport}
+              columns={columns}
+              setColumns={setColumns}
+              count={filteredRows.length}
+              total={results.length}
+            />
+
+            <div className="table-wrap">
+              <div className="table-scroll">
+                <table>
+                  <thead>
+                    <tr>
+                      <th className="th" style={{width:28}}/>
+                      {columns.includes("sub")     && <Th id="sub"     label="Subdomain"   {...thProps}/>}
+                      {columns.includes("status")  && <Th id="status"  label="Status"      {...thProps} w={90}/>}
+                      {columns.includes("ip")      && <Th id="ip"      label="IP Address"  {...thProps}/>}
+                      {columns.includes("host")    && <Th id="host"    label="Hosting"     {...thProps}/>}
+                      {columns.includes("country") && <Th id="country" label="Country"     {...thProps} w={80}/>}
+                      {columns.includes("title")   && <Th id="title"   label="Page Title"  {...thProps}/>}
+                      {columns.includes("techs")   && <Th id="techs"   label="Tech Stack"  {...thProps}/>}
+                      {columns.includes("ports")   && <Th id="ports"   label="Ports"       {...thProps} w={90}/>}
+                      {columns.includes("ssl")     && <Th id="ssl"     label="SSL"         {...thProps} w={60}/>}
+                      {columns.includes("risk")    && <Th id="risk"    label="Risk"        {...thProps} w={110}/>}
+                      {columns.includes("seen")    && <Th id="seen"    label="Last Seen"   {...thProps} w={90}/>}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredRows.length === 0 ? (
+                      <tr><td colSpan={columns.length+1} className="no-results">No results match your filters.</td></tr>
+                    ) : filteredRows.map(r => (
+                      <TableRow
+                        key={r.id}
+                        r={r}
+                        expanded={expanded === r.id}
+                        onToggle={() => setExpanded(expanded===r.id ? null : r.id)}
+                        columns={columns}
+                        copied={copied}
+                        setCopied={setCopied}
+                        onOpen={setOpenDetail}
+                      />
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </>
+        )}
+
+        {!results && !scanning && (
+          <div className="empty-state">
+            <div className="empty-state-icon"><I.Globe style={{width:28,height:28}}/></div>
+            <h3>Discover subdomains</h3>
+            <p>Enter a domain above and click Scan to discover all subdomains, check their live status, SSL certificates, tech stack, and risk posture.</p>
+          </div>
+        )}
+      </main>
+
+      {/* Detail modal */}
+      {openDetail && (
+        <DetailModal
+          r={openDetail}
+          whois={whois}
+          onClose={() => setOpenDetail(null)}
+          copied={copied}
+          setCopied={setCopied}
+        />
+      )}
+
+      {/* Settings */}
+      {showSettings && (
+        <SettingsPanel
+          theme={theme} setTheme={setTheme}
+          density={density} setDensity={setDensity}
+          onClose={() => setShowSettings(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>
