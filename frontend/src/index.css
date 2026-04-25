@@ -307,6 +307,7 @@ table { width:100%; border-collapse:collapse; }
 .table { width:100%; border-collapse:collapse; }
 .th { padding:9px 12px; text-align:left; font-size:11px; font-weight:600; letter-spacing:.04em; text-transform:uppercase; color:var(--fg-2); border-bottom:1px solid var(--border); background:var(--surface-2); white-space:nowrap; cursor:pointer; user-select:none; }
 .th-active { color:var(--accent); }
+.th-checkbox { width:36px; padding:9px 4px 9px 12px; }
 .th-chevron,.th-open { width:28px; padding:9px 4px; }
 .sort-chevron { display:inline-block; vertical-align:middle; margin-left:3px; opacity:.4; transition:transform .15s,opacity .15s; }
 .sort-chevron.sort-asc { opacity:1; transform:rotate(180deg); }
@@ -317,6 +318,11 @@ table { width:100%; border-collapse:collapse; }
 .tr:last-child td { border-bottom:none; }
 .tr-detail td { background:var(--surface-2); padding:0; border-bottom:1px solid var(--border); }
 td { padding:9px 12px; border-bottom:1px solid var(--border); vertical-align:middle; font-size:12.5px; white-space:nowrap; }
+.td-checkbox { width:36px; padding:9px 4px 9px 12px !important; }
+.row-checkbox { accent-color:var(--accent); width:14px; height:14px; cursor:pointer; }
+.tr-selected td { background:color-mix(in srgb,var(--accent) 8%,transparent) !important; }
+.tr-selected:hover td { background:color-mix(in srgb,var(--accent) 14%,transparent) !important; }
+.toolbar-selected { color:var(--accent); font-weight:600; }
 .td-chevron { width:28px; padding-right:0 !important; color:var(--fg-3); }
 .td-title { max-width:200px; }
 .td-open { width:32px; padding-left:0 !important; }
@@ -357,10 +363,11 @@ td { padding:9px 12px; border-bottom:1px solid var(--border); vertical-align:mid
 .risk-bar-fill { height:100%; border-radius:3px; transition:width .4s; }
 .risk-bar-label { font-size:13px; font-weight:700; width:28px; text-align:right; }
 .takeover-badge { display:flex; align-items:center; gap:5px; padding:6px 10px; background:var(--bad-bg); color:var(--bad-fg); border-radius:5px; font-size:12px; font-weight:600; }
-.dns-row { display:flex; align-items:flex-start; gap:10px; font-size:12px; margin-bottom:4px; min-width:0; }
-.dns-type { font-family:ui-monospace,monospace; font-size:10px; font-weight:700; padding:2px 5px; background:var(--gray-100); border-radius:3px; color:var(--fg-2); min-width:32px; text-align:center; flex-shrink:0; margin-top:1px; }
-/* min-width:0 lets the flex child shrink below its content width so long records wrap instead of overflowing */
-.dns-vals { color:var(--fg); word-break:break-word; overflow-wrap:anywhere; min-width:0; }
+.dns-row { display:flex; align-items:center; gap:10px; font-size:12px; margin-bottom:4px; min-width:0; }
+.dns-type { font-family:ui-monospace,monospace; font-size:10px; font-weight:700; padding:2px 5px; background:var(--gray-100); border-radius:3px; color:var(--fg-2); min-width:32px; text-align:center; flex-shrink:0; }
+.dns-vals { color:var(--fg); min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+/* DNS section spans two grid columns so there's room to show record values */
+.detail-section-dns { grid-column:span 2; }
 .kv { display:flex; justify-content:space-between; align-items:baseline; gap:8px; font-size:12px; margin-bottom:6px; min-width:0; }
 .kv span:first-child { color:var(--fg-2); flex-shrink:0; }
 .kv span:last-child, .kv code { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }

@@ -13,11 +13,12 @@ interface Props {
   onExportJson: () => void;
   total: number;
   shown: number;
+  selectedCount: number;
 }
 
 export default function Toolbar({
   filters, setFilters, visibleCols, setVisibleCols,
-  countries, techs, onExportCsv, onExportJson, total, shown,
+  countries, techs, onExportCsv, onExportJson, total, shown, selectedCount,
 }: Props) {
   const [colOpen, setColOpen] = React.useState(false);
   const [expOpen, setExpOpen] = React.useState(false);
@@ -84,6 +85,7 @@ export default function Toolbar({
 
         <span className="toolbar-count">
           {shown === total ? `${total} results` : `${shown} / ${total}`}
+          {selectedCount > 0 && <span className="toolbar-selected"> · {selectedCount} selected</span>}
         </span>
       </div>
 
@@ -116,15 +118,16 @@ export default function Toolbar({
 
         <div className="dropdown-wrap" ref={expRef}>
           <button className="toolbar-btn" onClick={() => setExpOpen(!expOpen)}>
-            <I.Download /> Export
+            <I.Download />
+            {selectedCount > 0 ? `Export (${selectedCount})` : "Export"}
           </button>
           {expOpen && (
             <div className="dropdown">
               <button className="dropdown-item" onClick={() => { onExportCsv(); setExpOpen(false); }}>
-                Export CSV
+                {selectedCount > 0 ? `CSV — ${selectedCount} selected` : "Export all CSV"}
               </button>
               <button className="dropdown-item" onClick={() => { onExportJson(); setExpOpen(false); }}>
-                Export JSON
+                {selectedCount > 0 ? `JSON — ${selectedCount} selected` : "Export all JSON"}
               </button>
             </div>
           )}

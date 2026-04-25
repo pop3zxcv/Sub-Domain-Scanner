@@ -77,6 +77,7 @@ export default function App() {
   const [theme, setTheme]           = useState<Theme>("dark");
   const [density, setDensity]       = useState<Density>("default");
   const [copied, setCopied]         = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const esRef = useRef<EventSource | null>(null);
   const idRef = useRef(0);
 
@@ -95,6 +96,7 @@ export default function App() {
     setScanning(true);
     setExpandedId(null);
     setOpenDetail(null);
+    setSelectedIds(new Set());
     idRef.current = 0;
 
     const endpoint = scanMode === "quick" ? "/api/quick" : "/api/scan";
@@ -172,19 +174,41 @@ export default function App() {
     [results]
   );
 
-  const exportCsv = () => {
+  const toggleSelect = useCallback((id: number) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }, []);
+
+  const toggleSelectAll = useCallback((visibleResults: SubdomainResult[]) => {
+    setSelectedIds((prev) => {
+      const allVisible = visibleResults.map((r) => r.id);
+      const allSelected = allVisible.every((id) => prev.has(id));
+      if (allSelected) return new Set();
+      return new Set([...prev, ...allVisible]);
+    });
+  }, []);
+
+  function rowsToExport(all: SubdomainResult[]) {
+    return selectedIds.size > 0 ? all.filter((r) => selectedIds.has(r.id)) : all;
+  }
+
+  const exportCsv = (rows = sorted) => {
+    const data = rowsToExport(rows);
     const header = ["fqdn","status","ip","country","title","ports","ssl","risk","takeover","source"];
-    const rows = sorted.map((r) => [
+    const body = data.map((r) => [
       r.fqdn, r.status, r.ip, r.country?.country ?? "",
       `"${(r.title ?? "").replace(/"/g, '""')}"`,
       r.ports.join(";"), r.ssl?.grade ?? "", r.risk, r.takeover, r.source,
     ]);
-    const csv = [header, ...rows].map((r) => r.join(",")).join("\n");
+    const csv = [header, ...body].map((r) => r.join(",")).join("\n");
     download("subdomains.csv", "text/csv", csv);
   };
 
-  const exportJson = () => {
-    download("subdomains.json", "application/json", JSON.stringify(sorted, null, 2));
+  const exportJson = (rows = sorted) => {
+    download("subdomains.json", "application/json", JSON.stringify(rowsToExport(rows), null, 2));
   };
 
   function download(name: string, type: string, content: string) {
@@ -236,10 +260,11 @@ export default function App() {
               setVisibleCols={setVisibleCols}
               countries={countries}
               techs={techs}
-              onExportCsv={exportCsv}
-              onExportJson={exportJson}
+              onExportCsv={() => exportCsv()}
+              onExportJson={() => exportJson()}
               total={results.length}
               shown={filtered.length}
+              selectedCount={selectedIds.size}
             />
             <DataTable
               results={sorted}
@@ -251,6 +276,9 @@ export default function App() {
               onOpen={handleOpen}
               copied={copied}
               setCopied={setCopied}
+              selectedIds={selectedIds}
+              onToggleSelect={toggleSelect}
+              onToggleSelectAll={() => toggleSelectAll(sorted)}
             />
           </>
         )}
