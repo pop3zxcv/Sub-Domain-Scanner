@@ -187,6 +187,80 @@ async def rapiddns(session: aiohttp.ClientSession, domain: str) -> Set[str]:
     return _extract_subs(text, domain)
 
 
+# ── Additional passive sources ───────────────────────────────────────────────
+
+async def certspotter(session: aiohttp.ClientSession, domain: str) -> Set[str]:
+    """CertSpotter CT log — different database from crt.sh, often finds unique certs."""
+    data = await _get(
+        session,
+        f"https://api.certspotter.com/v1/issuances?domain={domain}&include_subdomains=true&expand=dns_names",
+        headers={"User-Agent": "SubSentry/1.0"},
+        timeout=aiohttp.ClientTimeout(total=20),
+    )
+    if not data:
+        return set()
+    try:
+        import json
+        entries = json.loads(data)
+        subs: Set[str] = set()
+        for entry in entries:
+            for name in entry.get("dns_names", []):
+                subs.update(_extract_subs(name.lstrip("*."), domain))
+        return subs
+    except Exception:
+        return set()
+
+
+async def bufferover(session: aiohttp.ClientSession, domain: str) -> Set[str]:
+    """Rapid7 / BufferOver passive DNS."""
+    data = await _get(
+        session,
+        f"https://dns.bufferover.run/dns?q=.{domain}",
+        headers={"User-Agent": "SubSentry/1.0"},
+        timeout=aiohttp.ClientTimeout(total=10),
+    )
+    if not data:
+        return set()
+    try:
+        import json
+        resp = json.loads(data)
+        text = " ".join(resp.get("FDNS_A", []) + resp.get("RDNS", []))
+        return _extract_subs(text, domain)
+    except Exception:
+        return set()
+
+
+async def zone_transfer(domain: str) -> Set[str]:
+    """Attempt DNS AXFR zone transfer against every nameserver. Usually blocked, but worth trying."""
+    import dns.asyncresolver
+    import dns.asyncquery
+    import dns.rdatatype
+    import dns.zone as dnszone
+    import dns.name
+
+    subs: Set[str] = set()
+    try:
+        ns_answers = await dns.asyncresolver.resolve(domain, "NS", lifetime=5)
+        nameservers = [str(r.target).rstrip(".") for r in ns_answers]
+    except Exception:
+        return subs
+
+    for ns in nameservers:
+        try:
+            z = await asyncio.wait_for(
+                dns.asyncquery.inbound_xfr(ns, domain), timeout=8
+            )
+            origin = dns.name.from_text(domain)
+            for name in z.nodes:
+                label = name.relativize(origin)
+                sub = str(label).rstrip(".")
+                if sub and sub != "@" and "*" not in sub:
+                    subs.add(sub)
+        except Exception:
+            continue
+    return subs
+
+
 # ── Wordlist DNS bruteforce ───────────────────────────────────────────────────
 
 async def wordlist_bruteforce(domain: str) -> Set[str]:
@@ -230,15 +304,21 @@ async def discover_subdomains(domain: str, quick: bool = False) -> list[str]:
             wayback(session, domain),
             threatcrowd(session, domain),
             rapiddns(session, domain),
+            certspotter(session, domain),
+            bufferover(session, domain),
             return_exceptions=True,
         )
         if quick:
-            passive_results = await passive_task
+            passive_results, axfr_results = await asyncio.gather(
+                passive_task,
+                zone_transfer(domain),
+            )
             brute_results: Set[str] = set()
         else:
-            passive_results, brute_results = await asyncio.gather(
+            passive_results, brute_results, axfr_results = await asyncio.gather(
                 passive_task,
                 wordlist_bruteforce(domain),
+                zone_transfer(domain),
             )
 
     all_subs: Set[str] = set()
@@ -246,6 +326,8 @@ async def discover_subdomains(domain: str, quick: bool = False) -> list[str]:
         if isinstance(r, set):
             all_subs |= r
     all_subs |= brute_results
+    if isinstance(axfr_results, set):
+        all_subs |= axfr_results
 
     # Sanitise: strip wildcard prefixes, drop overly deep labels
     cleaned: Set[str] = set()
