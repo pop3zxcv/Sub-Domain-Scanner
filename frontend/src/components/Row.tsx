@@ -12,6 +12,8 @@ interface Props {
   onOpen: () => void;
   copied: string | null;
   setCopied: (v: string | null) => void;
+  selected: boolean;
+  onToggleSelect: () => void;
 }
 
 function statusClass(s: number) {
@@ -38,13 +40,21 @@ function sslClass(g: string) {
 }
 
 export default function Row({
-  result, visibleCols, expanded, onToggle, onOpen, copied, setCopied,
+  result, visibleCols, expanded, onToggle, onOpen, copied, setCopied, selected, onToggleSelect,
 }: Props) {
   const cols = visibleCols;
 
   return (
     <>
-      <tr className={`tr ${expanded ? "tr-expanded" : ""}`} onClick={onToggle}>
+      <tr className={`tr ${expanded ? "tr-expanded" : ""} ${selected ? "tr-selected" : ""}`} onClick={onToggle}>
+        <td className="td-checkbox" onClick={(e) => e.stopPropagation()}>
+          <input
+            type="checkbox"
+            className="row-checkbox"
+            checked={selected}
+            onChange={onToggleSelect}
+          />
+        </td>
         <td className="td-chevron">
           <I.Chevron className={`chevron ${expanded ? "chevron-open" : ""}`} />
         </td>
@@ -160,7 +170,7 @@ export default function Row({
 
       {expanded && (
         <tr className="tr-detail">
-          <td colSpan={cols.length + 3}>
+          <td colSpan={cols.length + 4}>
             <DetailPanel result={result} />
           </td>
         </tr>

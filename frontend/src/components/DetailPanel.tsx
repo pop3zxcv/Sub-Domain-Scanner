@@ -34,15 +34,16 @@ export default function DetailPanel({ result }: Props) {
           )}
         </section>
 
-        <section className="detail-section">
+        <section className="detail-section detail-section-dns">
           <h4>DNS Records</h4>
           {(["A","AAAA","CNAME","MX","TXT","NS"] as const).map((type) => {
             const vals = dns[type];
             if (!vals?.length) return null;
+            const full = vals.join(", ");
             return (
               <div key={type} className="dns-row">
                 <span className="dns-type">{type}</span>
-                <span className="dns-vals">{vals.join(", ")}</span>
+                <span className="dns-vals" title={full}>{full}</span>
               </div>
             );
           })}
